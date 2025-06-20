@@ -8,8 +8,8 @@ import (
 
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/packages/ssestream"
-	"github.com/honganh1206/clue/conversation"
 	"github.com/honganh1206/clue/prompts"
+	"github.com/honganh1206/clue/server/conversation"
 	"github.com/honganh1206/clue/tools"
 )
 
@@ -20,7 +20,7 @@ type AnthropicModel struct {
 	cache     anthropic.CacheControlEphemeralParam
 }
 
-func NewAnthropicModel(client *anthropic.Client, promptPath string, model ModelVersion, maxTokens int64) *AnthropicModel {
+func NewAnthropicModel(client *anthropic.Client, model ModelVersion, maxTokens int64) *AnthropicModel {
 	if model == "" {
 		model = ModelVersion(anthropic.ModelClaudeSonnet4_0)
 	}
@@ -65,7 +65,7 @@ func getAnthropicModel(model ModelVersion) anthropic.Model {
 	}
 }
 
-func (m *AnthropicModel) RunInference(ctx context.Context, msgs []*conversation.MessageParam, tools []tools.ToolDefinition) (*conversation.MessageResponse, error) {
+func (m *AnthropicModel) CompleteStream(ctx context.Context, msgs []*conversation.MessageParam, tools []tools.ToolDefinition) (*conversation.MessageResponse, error) {
 	anthropicMsgs := convertToAnthropicMsgs(msgs)
 
 	anthropicTools, err := m.convertToAnthropicTools(tools)

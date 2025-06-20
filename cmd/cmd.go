@@ -4,21 +4,21 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"time"
 
-	"github.com/honganh1206/clue/agent"
-	"github.com/honganh1206/clue/conversation"
 	"github.com/honganh1206/clue/inference"
-	"github.com/honganh1206/clue/prompts"
+	"github.com/honganh1206/clue/server"
+	"github.com/honganh1206/clue/server/conversation"
 	"github.com/honganh1206/clue/utils"
 	"github.com/spf13/cobra"
 )
 
 var (
 	modelConfig  inference.ModelConfig
-	envPath      string
 	verbose      bool
 	continueConv bool
 	convID       string
@@ -65,11 +65,6 @@ func ChatHandler(cmd *cobra.Command, args []string) error {
 	}
 	defer db.Close()
 
-	// FIXME: Some way to make this more configurable?
-	systemPrompt := prompts.ClaudeSystemPrompt()
-
-	modelConfig.PromptPath = systemPrompt
-
 	provider := inference.ProviderName(modelConfig.Provider)
 	if modelConfig.Model == "" {
 		defaultModel := inference.GetDefaultModel(provider)
@@ -79,26 +74,40 @@ func ChatHandler(cmd *cobra.Command, args []string) error {
 		modelConfig.Model = string(defaultModel)
 	}
 
-	var conversationID string
+	var convID string
 	if new {
-		conversationID = ""
+		convID = ""
 	} else {
 		if id != "" {
-			conversationID = id
+			convID = id
 		} else {
-			conversationID, err = conversation.LatestID(db)
+			convID, err = conversation.LatestID(db)
 			if err != nil {
 				return err
 			}
 		}
 	}
 
-	err = agent.Gen(conversationID, modelConfig, db)
+	err = interactive(cmd.Context(), convID, modelConfig, db)
 	if err != nil {
 		fmt.Printf("Error: %s\n", err.Error())
 	}
 
 	return nil
+}
+
+func RunServer(cmd *cobra.Command, args []string) error {
+	ln, err := net.Listen("tcp", ":11435")
+	if err != nil {
+		return err
+	}
+
+	err = server.Serve(ln)
+	if errors.Is(err, http.ErrServerClosed) {
+		return nil
+	}
+
+	return err
 }
 
 func ConversationHandler(cmd *cobra.Command, args []string) error {
@@ -208,6 +217,14 @@ func NewCLI() *cobra.Command {
 			fmt.Printf("Clue version %s (commit: %s, built: %s)\n", Version, GitCommit, BuildTime)
 		},
 	}
+
+	serveCmd := &cobra.Command{
+		Use:   "serve",
+		Short: "Start clue server",
+		Args:  cobra.ExactArgs(0),
+		RunE:  RunServer,
+	}
+
 	rootCmd := &cobra.Command{
 		Use:   "clue",
 		Short: "An AI agent for code editing and assistance",
@@ -221,7 +238,7 @@ func NewCLI() *cobra.Command {
 	rootCmd.Flags().BoolVarP(&continueConv, "new-conversation", "n", true, "Continue from the latest conversation")
 	rootCmd.Flags().StringVarP(&convID, "id", "i", "", "Conversation ID to ")
 
-	rootCmd.AddCommand(versionCmd, modelCmd, conversationCmd, helpCmd)
+	rootCmd.AddCommand(versionCmd, modelCmd, conversationCmd, helpCmd, serveCmd)
 
 	return rootCmd
 }

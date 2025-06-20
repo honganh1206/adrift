@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/honganh1206/clue/db"
+	"github.com/honganh1206/clue/server/db"
 	"github.com/honganh1206/clue/utils"
 )
 
@@ -41,7 +41,7 @@ func InitDB(dsn string) (*sql.DB, error) {
 		MaxIdleTime:  "15m",
 	}
 
-	conversationDb, err := db.InitDB(dbConfig, schemaSQL)
+	conversationDb, err := db.OpenDB(dbConfig, schemaSQL)
 	if err != nil {
 		return nil, err
 	}
